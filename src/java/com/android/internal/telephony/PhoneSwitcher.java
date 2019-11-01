@@ -332,13 +332,7 @@ public class PhoneSwitcher extends Handler {
             }
         }
 
-        if (mPhoneIdInVoiceCall != oldPhoneIdInVoiceCall) {
-            log("isPhoneInVoiceCallChanged from phoneId " + oldPhoneIdInVoiceCall
-                    + " to phoneId " + mPhoneIdInVoiceCall);
-            return true;
-        } else {
-            return false;
-        }
+        return (mPhoneIdInVoiceCall != oldPhoneIdInVoiceCall);
     }
 
     @VisibleForTesting
@@ -619,6 +613,19 @@ public class PhoneSwitcher extends Handler {
         }
     }
 
+    private boolean isEmergency() {
+        if (isInEmergencyCallbackMode()) return true;
+        for (Phone p : mPhones) {
+            if (p == null) continue;
+            if (p.isInEmergencyCall()) return true;
+            Phone imsPhone = p.getImsPhone();
+            if (imsPhone != null && imsPhone.isInEmergencyCall()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean isInEmergencyCallbackMode() {
         for (Phone p : mPhones) {
             if (p == null) continue;
@@ -729,6 +736,10 @@ public class PhoneSwitcher extends Handler {
      */
     private boolean onEvaluate(boolean requestsChanged, String reason) {
         StringBuilder sb = new StringBuilder(reason);
+        if (isEmergency()) {
+            log("onEvaluate for reason " + reason + " aborted due to Emergency");
+            return false;
+        }
 
         // If we use HAL_COMMAND_PREFERRED_DATA,
         boolean diffDetected = mHalCommandToUse != HAL_COMMAND_PREFERRED_DATA && requestsChanged;
@@ -803,19 +814,12 @@ public class PhoneSwitcher extends Handler {
                         newActivePhones.add(mPhones[i].getPhoneId());
                     }
                 } else {
-                    // First try to activate phone in voice call.
-                    if (mPhoneIdInVoiceCall != SubscriptionManager.INVALID_PHONE_INDEX) {
-                        newActivePhones.add(mPhoneIdInVoiceCall);
-                    }
-
-                    if (newActivePhones.size() < mMaxActivePhones) {
-                        for (DcRequest dcRequest : mPrioritizedDcRequests) {
-                            int phoneIdForRequest = phoneIdForRequest(dcRequest.networkRequest);
-                            if (phoneIdForRequest == INVALID_PHONE_INDEX) continue;
-                            if (newActivePhones.contains(phoneIdForRequest)) continue;
-                            newActivePhones.add(phoneIdForRequest);
-                            if (newActivePhones.size() >= mMaxActivePhones) break;
-                        }
+                    for (DcRequest dcRequest : mPrioritizedDcRequests) {
+                        int phoneIdForRequest = phoneIdForRequest(dcRequest.networkRequest);
+                        if (phoneIdForRequest == INVALID_PHONE_INDEX) continue;
+                        if (newActivePhones.contains(phoneIdForRequest)) continue;
+                        newActivePhones.add(phoneIdForRequest);
+                        if (newActivePhones.size() >= mMaxActivePhones) break;
                     }
 
                     if (newActivePhones.size() < mMaxActivePhones
