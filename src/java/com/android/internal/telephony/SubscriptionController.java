@@ -1817,7 +1817,7 @@ public class SubscriptionController extends ISub.Stub {
                 carrierText = plmn;
                 if (showSpn) {
                     // Need to show both plmn and spn if both are not same.
-                    if(!Objects.equals(spn, plmn)) {
+                    if (!spn.equalsIgnoreCase(plmn)) {
                         String separator = mContext.getString(
                                 com.android.internal.R.string.kg_text_message_separator).toString();
                         carrierText = new StringBuilder().append(carrierText).append(separator)
